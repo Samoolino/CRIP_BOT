@@ -35,8 +35,8 @@ contract FlashSwapExecutorExecutionForkTest is Test {
         uint256 minProfit = vm.envOr("MIN_PROFIT_WEI", uint256(0));
 
         if (
-            factory == address(0) || router == address(0) || pair == address(0)
-                || borrowToken == address(0) || intermediate == address(0) || amount == 0
+            factory == address(0) || router == address(0) || pair == address(0) || borrowToken == address(0)
+                || intermediate == address(0) || amount == 0
         ) return;
 
         uint256 fork = vm.createFork(rpc);
