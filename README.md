@@ -1,126 +1,200 @@
 # CRIP_BOT
 
-Original flash-swap arbitrage architecture inspired by the objective of `pedrobergamini/flashloaner-contract`, but implemented as a separate codebase with stronger validation boundaries and an explicit separation between execution, opportunity detection, and configuration.
+Original flash-swap arbitrage architecture using `pedrobergamini/flashloaner-contract` as the structural guide, but implemented as a separate codebase with deployment-aware validation, real-protocol fork testing, and explicit operational procedures.
 
 ## Objective
 
-Provide a test-first framework for atomic same-chain arbitrage using liquidity borrowed from a Uniswap V2-compatible pair, executing a configurable swap route, repaying the pair within the same transaction, and forwarding only verified surplus to the strategy owner/initiator.
+Perform atomic same-chain arbitrage using liquidity borrowed from a Uniswap V2-compatible pair, route the borrowed asset through an approved router, repay the originating pair in the same transaction, and retain only verified surplus.
 
-## Reference audit
+## Reference approach
 
-The reference repository is a Foundry project centered on `FlashLoaner.sol`. Its core callback:
+The reference repository is a Foundry project centered on `FlashLoaner.sol`. Its execution model is:
 
-1. receives a Uniswap V2 flash-swap callback;
-2. validates that only one borrow side is non-zero;
-3. reconstructs the expected pair address from the configured factory and a fixed init-code hash;
-4. swaps the borrowed asset through one router;
-5. calculates the repayment needed using V2 reserve math;
-6. requires the swap proceeds to cover repayment;
-7. repays the originating pair and forwards profit.
+1. receive `uniswapV2Call`;
+2. validate one-sided borrowing;
+3. authenticate the pair against factory configuration;
+4. identify the borrowed and repayment assets;
+5. approve a router;
+6. calculate V2 repayment from reserves;
+7. perform the swap;
+8. reject output below repayment;
+9. repay the source pair;
+10. forward surplus to the initiator.
 
-The reference also includes mocks, fuzz tests, deployment, simulation, and repayment-quote scripts.
+CRIP_BOT keeps this transaction pattern while separating market discovery and transaction policy into the off-chain layer.
 
-## CRIP_BOT design principles
+## No mocks
 
-- **Atomic settlement:** an execution is successful only when the original liquidity source can be repaid in the same transaction.
-- **Explicit trust boundaries:** the configured factory, callback caller, router, token path, and initiator are validated rather than inferred from loosely trusted calldata.
-- **No live-key material in source:** secrets belong in deployment/runtime secret managers, never Git.
-- **Testnet-first:** fork tests and mock tests must pass before any live-network deployment.
-- **Profit floor:** every execution has a minimum acceptable net surplus requirement.
-- **Deterministic route validation:** arbitrary call targets are not exposed in the first version.
-- **Separation of concerns:** Solidity handles atomic execution; the off-chain bot handles discovery, simulation, gas estimation, and submission policy.
+The repository intentionally does not use mock production protocols. Testing is performed against real deployed protocol contracts through Anvil/Foundry forks and, later, controlled testnet deployments.
 
-## Target architecture
+## Architecture
 
 ```text
-                    +---------------------------+
-                    |  Market / Opportunity     |
-                    |  Scanner + Quote Engine    |
-                    +-------------+-------------+
-                                  |
-                                  | candidate route
-                                  v
-                    +---------------------------+
-                    |  Risk / Profit Gate       |
-                    |  gas + slippage + minPnL  |
-                    +-------------+-------------+
-                                  |
-                                  | validated intent
-                                  v
-+----------------+      +---------------------------+
-| V2 Pair /      |----->| CRIP_BOT Executor         |
-| Liquidity Src  | cb   | atomic callback + swaps  |
-+----------------+      +-------------+-------------+
-                                      |
-                                      | repay
-                                      v
-                              +---------------+
-                              | Origin Pair   |
-                              +---------------+
-                                      |
-                                      | surplus
-                                      v
-                              +---------------+
-                              | Treasury /    |
-                              | Initiator     |
-                              +---------------+
+Market/DEX data
+      |
+      v
+Opportunity Scanner
+      |
+      v
+Quote + Repayment Model
+      |
+      v
+Gas / Slippage / Net-PnL Gate
+      |
+      v
+Fork Simulation / eth_call
+      |
+      v
+Transaction Signer
+      |
+      v
+FlashSwapExecutor
+      |
+      v
+V2 Pair -> callback -> approved router -> repay -> profit
 ```
 
-## Planned repository layout
+## Repository structure
 
 ```text
 CRIP_BOT/
 ├── src/
 │   ├── FlashSwapExecutor.sol
-│   ├── libraries/
-│   │   └── V2Math.sol
-│   └── interfaces/
-│       ├── IERC20.sol
-│       ├── IV2Pair.sol
-│       └── IV2Router02.sol
-├── test/
-│   ├── FlashSwapExecutor.t.sol
-│   └── mocks/
+│   ├── interfaces/
+│   │   ├── IERC20.sol
+│   │   ├── IV2Pair.sol
+│   │   └── IV2Router02.sol
+│   └── libraries/
+│       └── V2Math.sol
 ├── script/
 │   ├── DeployExecutor.s.sol
-│   └── QuoteRepayment.s.sol
-├── bot/
-│   ├── scanner/
-│   ├── simulator/
-│   ├── executor/
-│   └── risk/
+│   ├── QuoteRepayment.s.sol
+│   ├── InspectPair.s.sol
+│   └── SimulateFork.s.sol
+├── test/
+│   ├── FlashSwapExecutor.t.sol
+│   └── FlashSwapExecutor.fork.t.sol
 ├── docs/
 │   ├── REFERENCE_AUDIT.md
-│   ├── THREAT_MODEL.md
-│   └── ARCHITECTURE.md
+│   └── EXECUTION_PROCEDURE.md
 ├── foundry.toml
 └── .env.example
 ```
 
-## Security gates before mainnet
+## Installation
 
-1. Unit tests and fuzz tests pass.
-2. Invariant tests prove no successful execution leaves the executor unable to settle the source pair.
-3. Fork tests validate real router/pair behavior against the selected deployment.
-4. Static analysis and manual review are clean.
-5. Deployment addresses are immutable/configured per network.
-6. Private keys are injected through a secrets manager or CI secret store.
-7. Mainnet execution starts with low-value, bounded transactions and monitoring.
+```bash
+forge --version
+cast --version
+anvil --version
 
-## Important limitation of the reference implementation
+git clone https://github.com/Samoolino/CRIP_BOT.git
+cd CRIP_BOT
+forge install
+forge build
+forge fmt --check
+```
 
-The reference library derives V2 pairs using a fixed `INIT_CODE_HASH`. That is valid only for a deployment whose pair bytecode hash matches the configured constant. CRIP_BOT will treat pair derivation as a deployment-specific configuration and will prefer explicit factory verification, eliminating accidental use of a mismatched hash.
+## Ignition / deployment flow
 
-## Development order
+The deployment process follows the reference repository's Foundry-script pattern:
 
-**Phase 1:** reference audit + threat model.
+```text
+Select network
+   -> load RPC/configuration
+   -> dry-run deployment
+   -> broadcast deployment
+   -> inspect deployed executor
+   -> verify real factory/pair relationship
+   -> configure pair
+   -> record address + artifact hash
+   -> do not trade during deployment
+```
 
-**Phase 2:** minimal executor + mocks + unit/fuzz tests.
+Dry run:
 
-**Phase 3:** fork testing against a selected V2 deployment.
+```bash
+forge script script/DeployExecutor.s.sol --rpc-url "$RPC_URL"
+```
 
-**Phase 4:** off-chain scanner, simulation, gas-aware profitability gate.
+Broadcast only after review:
 
-**Phase 5:** testnet deployment and monitored dry-run.
+```bash
+forge script script/DeployExecutor.s.sol --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --broadcast
+```
 
-**Phase 6:** controlled production rollout after independent contract review.
+## Execution strategy
+
+The off-chain bot does not submit every apparent price difference. A candidate is executed only when:
+
+```text
+expected_return
+- flash-swap_repayment
+- swap_fees
+- gas_cost
+- slippage_allowance
+- safety_margin
+> minimum_net_profit
+```
+
+The sequence is:
+
+```text
+discover -> quote -> calculate repayment -> estimate gas
+-> calculate net PnL -> simulate -> sign -> submit -> monitor
+```
+
+## Security model
+
+The contract enforces:
+
+- owner-only initiation;
+- one configured real pair;
+- factory relationship validation;
+- callback-caller authentication;
+- callback-sender authentication;
+- one-sided borrowing;
+- borrow-token/path validation;
+- router restriction;
+- exact V2 flash-swap repayment mathematics;
+- minimum profit enforcement;
+- profit forwarding only after repayment;
+- no private key handling in the contract.
+
+The reference implementation's fixed V2 `INIT_CODE_HASH` is treated as deployment-specific and is not copied as a universal constant.
+
+## Operational stages
+
+**Stage A:** compile and static review.
+
+**Stage B:** inspect real factory/router/pair addresses.
+
+**Stage C:** run fork simulations against actual protocol bytecode.
+
+**Stage D:** deploy exact artifact to testnet.
+
+**Stage E:** run bounded controlled transactions.
+
+**Stage F:** activate monitored opportunity scanning.
+
+**Stage G:** enable production signing only after the complete path is reproducible.
+
+See `docs/EXECUTION_PROCEDURE.md` for the installation, ignition, execution, signer, monitoring and shutdown procedures.
+
+## Ending / shutdown
+
+To stop the system safely:
+
+1. stop opportunity submission;
+2. let already-broadcast transactions settle;
+3. inspect executor balances;
+4. withdraw verified profits where appropriate;
+5. disable the signing key from the runtime;
+6. preserve transaction hashes and logs;
+7. keep the deployed address and artifact hash for audit.
+
+## Production rule
+
+Deployment alone does not constitute a live trading system. CRIP_BOT is operational only when the entire path is functioning:
+
+`scanner -> quote -> profitability -> simulation -> signing -> atomic execution -> repayment -> profit -> monitoring`.
