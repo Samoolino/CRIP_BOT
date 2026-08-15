@@ -1,0 +1,12 @@
+{
+  "network": "ethereum-sepolia",
+  "chainId": 11155111,
+  "protocol": "Uniswap V2",
+  "factory": "0xF62c03E08ada871A0bEb309762E260a7a6a880E6",
+  "router02": "0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3",
+  "pair": null,
+  "pairSelection": "must be discovered and independently verified on the fork",
+  "status": "reference-profile-only",
+  "liveExecutionAuthorized": false,
+  "source": "https://developers.uniswap.org/docs/protocols/v2/deployments"
+}
