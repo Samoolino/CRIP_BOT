@@ -20,8 +20,23 @@ jobs:
         with:
           version: stable
 
+      - name: Validate fork configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RPC_URL" || { echo 'Missing CRIP_RPC_URL'; exit 1; }
+          test -n "$V2_FACTORY" || { echo 'Missing CRIP_V2_FACTORY'; exit 1; }
+          test -n "$V2_ROUTER" || { echo 'Missing CRIP_V2_ROUTER'; exit 1; }
+          test -n "$V2_PAIR" || { echo 'Missing CRIP_V2_PAIR'; exit 1; }
+
       - name: Install Foundry standard library
         run: forge install foundry-rs/forge-std
+
+      - name: Format check
+        run: forge fmt --check
+
+      - name: Build
+        run: forge build --sizes
 
       - name: Run real deployment inspection
         run: forge test --match-path test/FlashSwapExecutor.fork.t.sol -vvv
