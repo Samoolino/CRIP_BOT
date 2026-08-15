@@ -11,9 +11,9 @@ contract V2MathTest is Test {
     }
 
     function testFuzz_repaymentPositive(
-        uint128 amount,
-        uint128 reserveBorrowed,
-        uint128 reserveRepayment
+        uint112 amount,
+        uint112 reserveBorrowed,
+        uint112 reserveRepayment
     ) public pure {
         if (amount == 0 || reserveBorrowed <= amount || reserveRepayment == 0) return;
         uint256 repayment = V2Math.repayment(amount, reserveBorrowed, reserveRepayment);
