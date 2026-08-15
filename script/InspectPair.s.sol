@@ -9,10 +9,11 @@ contract InspectPair is Script {
         address pair = vm.envAddress("V2_PAIR");
         address expectedFactory = vm.envAddress("V2_FACTORY");
 
-        address factory = IV2Pair(pair).factory();
-        address token0 = IV2Pair(pair).token0();
-        address token1 = IV2Pair(pair).token1();
-        (uint112 reserve0, uint112 reserve1, uint32 timestamp) = IV2Pair(pair).getReserves();
+        IV2Pair p = IV2Pair(pair);
+        address factory = p.factory();
+        address token0 = p.token0();
+        address token1 = p.token1();
+        (uint112 reserve0, uint112 reserve1, uint32 timestamp) = p.getReserves();
 
         console2.log("pair", pair);
         console2.log("factory", factory);
