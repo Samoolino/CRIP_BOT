@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {IERC20} from "./interfaces/IERC20.sol";
+import {IV2Factory} from "./interfaces/IV2Factory.sol";
 import {IV2Pair} from "./interfaces/IV2Pair.sol";
 import {IV2Router02} from "./interfaces/IV2Router02.sol";
 
@@ -63,6 +64,7 @@ contract FlashSwapExecutor {
         address token0 = IV2Pair(pair).token0();
         address token1 = IV2Pair(pair).token1();
         if (token0 == address(0) || token1 == address(0) || token0 == token1) revert InvalidPair();
+        if (IV2Factory(factory).getPair(token0, token1) != pair) revert InvalidPair();
 
         configuredPair = pair;
         emit PairConfigured(pair, token0, token1);
