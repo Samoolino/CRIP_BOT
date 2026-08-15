@@ -18,10 +18,7 @@ contract RouterQuoteForkTest is Test {
         address borrowToken = vm.envOr("BORROW_TOKEN", address(0));
         address intermediate = vm.envOr("INTERMEDIATE_TOKEN", address(0));
         uint256 amount = vm.envOr("BORROW_AMOUNT_WEI", uint256(0));
-        if (
-            router == address(0) || pair == address(0) || borrowToken == address(0)
-                || intermediate == address(0) || amount == 0
-        ) return;
+        if (router == address(0) || pair == address(0) || borrowToken == address(0) || intermediate == address(0) || amount == 0) return;
 
         uint256 fork = vm.createFork(rpc);
         vm.selectFork(fork);
