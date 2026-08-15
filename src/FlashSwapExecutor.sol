@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IERC20} from './interfaces/IERC20.sol';
-import {IV2Pair} from './interfaces/IV2Pair.sol';
-import {IV2Router02} from './interfaces/IV2Router02.sol';
+import {IERC20} from "./interfaces/IERC20.sol";
+import {IV2Pair} from "./interfaces/IV2Pair.sol";
+import {IV2Router02} from "./interfaces/IV2Router02.sol";
 
 /// @notice Atomic V2-style flash-swap executor for one approved deployment.
 /// @dev Uses real protocol contracts; deployment-specific pair/factory/router values are explicit.
@@ -39,7 +39,10 @@ contract FlashSwapExecutor {
     );
     event ProfitWithdrawn(address indexed token, uint256 amount, address indexed recipient);
 
-    constructor(address factory_, address router_) {
+    constructor(
+        address factory_,
+        address router_
+    ) {
         if (factory_ == address(0) || router_ == address(0)) revert InvalidPair();
         owner = msg.sender;
         factory = factory_;
@@ -51,7 +54,9 @@ contract FlashSwapExecutor {
         _;
     }
 
-    function configurePair(address pair) external onlyOwner {
+    function configurePair(
+        address pair
+    ) external onlyOwner {
         if (configuredPair != address(0)) revert PairAlreadyConfigured();
         if (pair == address(0) || IV2Pair(pair).factory() != factory) revert InvalidPair();
 
@@ -99,13 +104,24 @@ contract FlashSwapExecutor {
         executing = false;
     }
 
-    function uniswapV2Call(address sender, uint256 amount0, uint256 amount1, bytes calldata data) external {
+    function uniswapV2Call(
+        address sender,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata data
+    ) external {
         if (msg.sender != configuredPair || sender != address(this)) revert NotPair();
         if (!executing) revert ExecutionActive();
         if ((amount0 == 0) == (amount1 == 0)) revert InvalidAmount();
 
-        (address borrowToken, uint256 borrowed, address[] memory path, uint256 minProfit, uint256 amountOutMin, uint256 deadline) =
-            abi.decode(data, (address, uint256, address[], uint256, uint256, uint256));
+        (
+            address borrowToken,
+            uint256 borrowed,
+            address[] memory path,
+            uint256 minProfit,
+            uint256 amountOutMin,
+            uint256 deadline
+        ) = abi.decode(data, (address, uint256, address[], uint256, uint256, uint256));
 
         if (block.timestamp > deadline) revert InvalidDeadline();
 
@@ -123,13 +139,7 @@ contract FlashSwapExecutor {
         uint256 repaymentBalanceBefore = IERC20(repaymentToken).balanceOf(address(this));
 
         _approve(borrowToken, router, borrowed);
-        IV2Router02(router).swapExactTokensForTokens(
-            borrowed,
-            amountOutMin,
-            path,
-            address(this),
-            deadline
-        );
+        IV2Router02(router).swapExactTokensForTokens(borrowed, amountOutMin, path, address(this), deadline);
 
         uint256 repayment = _repayment(borrowed, amount0 > 0);
         uint256 repaymentBalanceAfter = IERC20(repaymentToken).balanceOf(address(this));
@@ -145,7 +155,10 @@ contract FlashSwapExecutor {
         emit ArbitrageExecuted(msg.sender, borrowToken, repaymentToken, borrowed, repayment, profit);
     }
 
-    function _repayment(uint256 borrowed, bool borrowedToken0) internal view returns (uint256) {
+    function _repayment(
+        uint256 borrowed,
+        bool borrowedToken0
+    ) internal view returns (uint256) {
         (uint112 reserve0, uint112 reserve1,) = IV2Pair(configuredPair).getReserves();
         uint256 reserveBorrowed = borrowedToken0 ? reserve0 : reserve1;
         uint256 reserveRepayment = borrowedToken0 ? reserve1 : reserve0;
@@ -156,17 +169,28 @@ contract FlashSwapExecutor {
         return numerator / denominator + 1;
     }
 
-    function withdrawToken(address token, uint256 amount) external onlyOwner {
+    function withdrawToken(
+        address token,
+        uint256 amount
+    ) external onlyOwner {
         _transfer(token, owner, amount);
         emit ProfitWithdrawn(token, amount, owner);
     }
 
-    function _approve(address token, address spender, uint256 amount) internal {
+    function _approve(
+        address token,
+        address spender,
+        uint256 amount
+    ) internal {
         if (!IERC20(token).approve(spender, 0)) revert ApprovalFailed();
         if (!IERC20(token).approve(spender, amount)) revert ApprovalFailed();
     }
 
-    function _transfer(address token, address to, uint256 amount) internal {
+    function _transfer(
+        address token,
+        address to,
+        uint256 amount
+    ) internal {
         if (!IERC20(token).transfer(to, amount)) revert TransferFailed();
     }
 }
