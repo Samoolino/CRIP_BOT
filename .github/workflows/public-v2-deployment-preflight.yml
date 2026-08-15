@@ -1,0 +1,59 @@
+name: Public V2 Deployment Preflight
+
+on:
+  push:
+    branches:
+      - main
+      - integration/real-v2-fork-next
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  unichain-sepolia-readonly:
+    runs-on: ubuntu-latest
+    env:
+      RPC_URL: https://sepolia.unichain.org
+      EXPECTED_CHAIN_ID: "1301"
+      V2_FACTORY: "0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f"
+      V2_ROUTER: "0x920b806e40a00e02e7d2b94ffc89860fdaed3640"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Verify chain ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          chain_id=$(cast chain-id --rpc-url "$RPC_URL" | tr -d '[:space:]')
+          test "$chain_id" = "$EXPECTED_CHAIN_ID" || {
+            echo "Unexpected chain ID: $chain_id"
+            exit 1
+          }
+
+      - name: Verify V2 factory bytecode
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(cast code "$V2_FACTORY" --rpc-url "$RPC_URL")
+          test "$code" != "0x" || { echo 'Factory has no bytecode'; exit 1; }
+
+      - name: Verify V2 router bytecode
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(cast code "$V2_ROUTER" --rpc-url "$RPC_URL")
+          test "$code" != "0x" || { echo 'Router has no bytecode'; exit 1; }
+
+      - name: Verify factory/router metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "chain_id=$EXPECTED_CHAIN_ID"
+          echo "factory=$V2_FACTORY"
+          echo "router=$V2_ROUTER"
+          echo "mode=read-only"
+          echo "live_execution=false"
