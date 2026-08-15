@@ -35,10 +35,9 @@ jobs:
           test -n "$RPC_URL" || { echo 'Missing CRIP_RPC_URL'; exit 1; }
           test -n "$V2_FACTORY" || { echo 'Missing CRIP_V2_FACTORY'; exit 1; }
           test -n "$V2_ROUTER" || { echo 'Missing CRIP_V2_ROUTER'; exit 1; }
-          if [ -z "$V2_PAIR" ]; then
-            test -n "$BORROW_TOKEN" || { echo 'Missing CRIP_BORROW_TOKEN for factory-derived pair'; exit 1; }
-            test -n "$REPAYMENT_TOKEN" || { echo 'Missing CRIP_REPAYMENT_TOKEN for factory-derived pair'; exit 1; }
-          fi
+          test -n "$BORROW_TOKEN" || { echo 'Missing CRIP_BORROW_TOKEN'; exit 1; }
+          test -n "$REPAYMENT_TOKEN" || { echo 'Missing CRIP_REPAYMENT_TOKEN'; exit 1; }
+          test "$BORROW_TOKEN" != "$REPAYMENT_TOKEN" || { echo 'Borrow and repayment tokens must differ'; exit 1; }
 
       - name: Install Foundry standard library
         run: forge install foundry-rs/forge-std
@@ -65,13 +64,12 @@ jobs:
         run: forge test --match-path test/FlashSwapExecutor.fork.t.sol -vvv
 
       - name: Run optional real-router quote
-        if: ${{ env.BORROW_TOKEN != '' && env.INTERMEDIATE_TOKEN != '' && env.BORROW_AMOUNT_WEI != '' }}
+        if: ${{ env.BORROW_AMOUNT_WEI != '' && env.INTERMEDIATE_TOKEN != '' }}
         run: forge test --match-path test/RouterQuote.fork.t.sol -vvv
 
       - name: Run opt-in atomic execution on fork
         if: ${{ env.EXECUTE_FORK == 'true' }}
         run: |
-          test -n "$BORROW_TOKEN" || { echo 'Missing CRIP_BORROW_TOKEN'; exit 1; }
           test -n "$INTERMEDIATE_TOKEN" || { echo 'Missing CRIP_INTERMEDIATE_TOKEN'; exit 1; }
           test -n "$BORROW_AMOUNT_WEI" || { echo 'Missing CRIP_BORROW_AMOUNT_WEI'; exit 1; }
           test -n "$MIN_PROFIT_WEI" || { echo 'Missing CRIP_MIN_PROFIT_WEI'; exit 1; }
