@@ -11,6 +11,9 @@ jobs:
       V2_FACTORY: ${{ secrets.CRIP_V2_FACTORY }}
       V2_ROUTER: ${{ secrets.CRIP_V2_ROUTER }}
       V2_PAIR: ${{ secrets.CRIP_V2_PAIR }}
+      BORROW_TOKEN: ${{ secrets.CRIP_BORROW_TOKEN }}
+      INTERMEDIATE_TOKEN: ${{ secrets.CRIP_INTERMEDIATE_TOKEN }}
+      BORROW_AMOUNT_WEI: ${{ secrets.CRIP_BORROW_AMOUNT_WEI }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,3 +43,7 @@ jobs:
 
       - name: Run real deployment inspection
         run: forge test --match-path test/FlashSwapExecutor.fork.t.sol -vvv
+
+      - name: Run optional real-router quote
+        if: ${{ env.BORROW_TOKEN != '' && env.INTERMEDIATE_TOKEN != '' && env.BORROW_AMOUNT_WEI != '' }}
+        run: forge test --match-path test/RouterQuote.fork.t.sol -vvv
