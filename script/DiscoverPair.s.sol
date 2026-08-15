@@ -20,7 +20,11 @@ contract DiscoverPair is Script {
         require(p.factory() == factory, "pair factory mismatch");
         address token0 = p.token0();
         address token1 = p.token1();
-        require((token0 == tokenA || token0 == tokenB) && (token1 == tokenA || token1 == tokenB), "pair tokens mismatch");
+        require(
+            (token0 == tokenA || token0 == tokenB) &&
+            (token1 == tokenA || token1 == tokenB),
+            "pair tokens mismatch"
+        );
         (uint112 reserve0, uint112 reserve1,) = p.getReserves();
         require(reserve0 > 0 && reserve1 > 0, "pair has no liquidity");
 
