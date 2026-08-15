@@ -7,10 +7,10 @@ jobs:
   real-v2-fork:
     runs-on: ubuntu-latest
     env:
-      RPC_URL: ${{ secrets.CIP_RPC_URL }}
-      V2_FACTORY: ${{ secrets.CIP_V2_FACTORY }}
-      V2_ROUTER: ${{ secrets.CIP_V2_ROUTER }}
-      V2_PAIR: ${{ secrets.CIP_V2_PAIR }}
+      RPC_URL: ${{ secrets.CRIP_RPC_URL }}
+      V2_FACTORY: ${{ secrets.CRIP_V2_FACTORY }}
+      V2_ROUTER: ${{ secrets.CRIP_V2_ROUTER }}
+      V2_PAIR: ${{ secrets.CRIP_V2_PAIR }}
     steps:
       - uses: actions/checkout@v4
         with:
