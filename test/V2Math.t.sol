@@ -10,7 +10,11 @@ contract V2MathTest is Test {
         assertEq(repayment, 2026280862790391377);
     }
 
-    function testFuzz_repaymentPositive(uint128 amount, uint128 reserveBorrowed, uint128 reserveRepayment) public pure {
+    function testFuzz_repaymentPositive(
+        uint128 amount,
+        uint128 reserveBorrowed,
+        uint128 reserveRepayment
+    ) public pure {
         if (amount == 0 || reserveBorrowed <= amount || reserveRepayment == 0) return;
         uint256 repayment = V2Math.repayment(amount, reserveBorrowed, reserveRepayment);
         assertGt(repayment, 0);
