@@ -5,16 +5,15 @@ import {IERC20} from './interfaces/IERC20.sol';
 import {IV2Pair} from './interfaces/IV2Pair.sol';
 import {IV2Router02} from './interfaces/IV2Router02.sol';
 
-/// @notice Atomic V2-style flash-swap executor for a pre-approved deployment.
-/// @dev This is intentionally route-constrained in v1: one approved router and
-///      one two-token path. The off-chain bot performs opportunity discovery.
+/// @notice Atomic V2-style flash-swap executor for one approved deployment.
+/// @dev The reference project is used as the architecture guide; CRIP_BOT keeps
+///      the callback/repayment pattern and removes development mocks.
 contract FlashSwapExecutor {
     error NotOwner();
     error NotPair();
     error PairAlreadyConfigured();
     error InvalidPair();
     error InvalidAsset();
-    error InvalidRouter();
     error InvalidPath();
     error InvalidAmount();
     error InsufficientProfit(uint256 actual, uint256 minimum);
@@ -25,14 +24,13 @@ contract FlashSwapExecutor {
     address public immutable owner;
     address public immutable factory;
     address public immutable router;
-
     address public configuredPair;
     bool private executing;
 
-    event PairConfigured(address indexed pair, address indexed tokenBorrow, address indexed tokenIntermediate);
+    event PairConfigured(address indexed pair, address indexed token0, address indexed token1);
     event ArbitrageExecuted(
         address indexed pair,
-        address indexed tokenBorrow,
+        address indexed borrowedToken,
         uint256 borrowed,
         uint256 repayment,
         uint256 profit
@@ -51,13 +49,11 @@ contract FlashSwapExecutor {
         _;
     }
 
-    /// @notice Registers a pair after validating its factory and token addresses.
-    /// @dev Pair discovery remains deployment-specific and is deliberately not
-    ///      based on a copied universal init-code hash.
+    /// @notice Registers the real V2-compatible pair used for execution.
+    /// @dev The pair must report the configured factory. No copied universal init-code hash is used.
     function configurePair(address pair) external onlyOwner {
         if (configuredPair != address(0)) revert PairAlreadyConfigured();
-        if (pair == address(0)) revert InvalidPair();
-        if (IV2Pair(pair).factory() != factory) revert InvalidPair();
+        if (pair == address(0) || IV2Pair(pair).factory() != factory) revert InvalidPair();
 
         address token0 = IV2Pair(pair).token0();
         address token1 = IV2Pair(pair).token1();
@@ -67,11 +63,11 @@ contract FlashSwapExecutor {
         emit PairConfigured(pair, token0, token1);
     }
 
-    /// @notice Initiates a flash swap. The borrowed side is determined by token0/token1.
-    /// @param borrowToken Token borrowed from the pair.
-    /// @param amount Borrow amount.
-    /// @param path Exactly [borrowToken, intermediateToken, borrowToken] is required.
-    /// @param minProfit Minimum surplus after pair repayment.
+    /// @notice Starts a single-sided flash swap from the configured real pair.
+    /// @param borrowToken Asset borrowed from the pair.
+    /// @param amount Amount borrowed.
+    /// @param path Exact route [borrowToken, intermediateToken, borrowToken].
+    /// @param minProfit Minimum surplus remaining after repayment.
     function execute(
         address borrowToken,
         uint256 amount,
@@ -109,11 +105,11 @@ contract FlashSwapExecutor {
         address token0 = IV2Pair(msg.sender).token0();
         address token1 = IV2Pair(msg.sender).token1();
         address expectedBorrow = amount0 > 0 ? token0 : token1;
-        if (borrowToken != expectedBorrow || borrowed != (amount0 > 0 ? amount0 : amount1)) revert InvalidAsset();
+        uint256 callbackAmount = amount0 > 0 ? amount0 : amount1;
+        if (borrowToken != expectedBorrow || borrowed != callbackAmount) revert InvalidAsset();
         if (path.length != 3 || path[0] != borrowToken || path[2] != borrowToken) revert InvalidPath();
 
-        uint256 intermediateBefore = IERC20(path[1]).balanceOf(address(this));
-        _approve(path[0], router, borrowed);
+        _approve(borrowToken, router, borrowed);
         IV2Router02(router).swapExactTokensForTokens(
             borrowed,
             0,
@@ -123,29 +119,30 @@ contract FlashSwapExecutor {
         );
 
         uint256 borrowedBalance = IERC20(borrowToken).balanceOf(address(this));
-        uint256 repayment = _repayment(borrowed, amount0 > 0 ? token1 : token0);
-        uint256 intermediateAfter = IERC20(path[1]).balanceOf(address(this));
-        if (intermediateAfter < intermediateBefore) revert InvalidAmount();
-        if (borrowedBalance < repayment + minProfit) {
-            revert InsufficientProfit(borrowedBalance - (borrowedBalance < repayment ? borrowedBalance : repayment), minProfit);
+        uint256 repayment = _repayment(borrowed, amount0 > 0);
+        if (borrowedBalance < repayment) {
+            revert InsufficientProfit(0, minProfit);
         }
 
-        _transfer(borrowToken, msg.sender, repayment);
         uint256 profit = borrowedBalance - repayment;
+        if (profit < minProfit) revert InsufficientProfit(profit, minProfit);
+
+        _transfer(borrowToken, msg.sender, repayment);
         if (profit > 0) _transfer(borrowToken, owner, profit);
         emit ArbitrageExecuted(msg.sender, borrowToken, borrowed, repayment, profit);
     }
 
-    /// @dev V2 repayment for a single-sided flash swap, derived from the opposite reserve.
-    ///      amountIn = ceil(amountOut * 1000 * reserveIn / ((reserveOut-amountOut) * 997)).
-    function _repayment(uint256 amountOut, address otherToken) internal view returns (uint256) {
+    /// @dev V2 flash-swap repayment.
+    ///      Borrow token0: repayment is token1 = ceil(amount0Out * reserve1 * 1000 / ((reserve0-amount0Out)*997)).
+    ///      Borrow token1: repayment is token0 = ceil(amount1Out * reserve0 * 1000 / ((reserve1-amount1Out)*997)).
+    function _repayment(uint256 borrowed, bool borrowedToken0) internal view returns (uint256) {
         (uint112 reserve0, uint112 reserve1,) = IV2Pair(configuredPair).getReserves();
-        address token0 = IV2Pair(configuredPair).token0();
-        uint256 reserveOut = otherToken == token0 ? reserve0 : reserve1;
-        uint256 reserveIn = otherToken == token0 ? reserve1 : reserve0;
-        if (amountOut >= reserveOut) revert InvalidAmount();
-        uint256 numerator = amountOut * 1000 * reserveIn;
-        uint256 denominator = (reserveOut - amountOut) * 997;
+        uint256 reserveBorrowed = borrowedToken0 ? reserve0 : reserve1;
+        uint256 reserveRepayment = borrowedToken0 ? reserve1 : reserve0;
+        if (borrowed >= reserveBorrowed) revert InvalidAmount();
+
+        uint256 numerator = borrowed * reserveRepayment * 1000;
+        uint256 denominator = (reserveBorrowed - borrowed) * 997;
         return numerator / denominator + 1;
     }
 
