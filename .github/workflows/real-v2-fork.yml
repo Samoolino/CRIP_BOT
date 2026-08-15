@@ -12,6 +12,7 @@ jobs:
       V2_ROUTER: ${{ secrets.CRIP_V2_ROUTER }}
       V2_PAIR: ${{ secrets.CRIP_V2_PAIR }}
       BORROW_TOKEN: ${{ secrets.CRIP_BORROW_TOKEN }}
+      REPAYMENT_TOKEN: ${{ secrets.CRIP_REPAYMENT_TOKEN }}
       INTERMEDIATE_TOKEN: ${{ secrets.CRIP_INTERMEDIATE_TOKEN }}
       BORROW_AMOUNT_WEI: ${{ secrets.CRIP_BORROW_AMOUNT_WEI }}
       MIN_PROFIT_WEI: ${{ secrets.CRIP_MIN_PROFIT_WEI }}
@@ -34,7 +35,10 @@ jobs:
           test -n "$RPC_URL" || { echo 'Missing CRIP_RPC_URL'; exit 1; }
           test -n "$V2_FACTORY" || { echo 'Missing CRIP_V2_FACTORY'; exit 1; }
           test -n "$V2_ROUTER" || { echo 'Missing CRIP_V2_ROUTER'; exit 1; }
-          test -n "$V2_PAIR" || { echo 'Missing CRIP_V2_PAIR'; exit 1; }
+          if [ -z "$V2_PAIR" ]; then
+            test -n "$BORROW_TOKEN" || { echo 'Missing CRIP_BORROW_TOKEN for factory-derived pair'; exit 1; }
+            test -n "$REPAYMENT_TOKEN" || { echo 'Missing CRIP_REPAYMENT_TOKEN for factory-derived pair'; exit 1; }
+          fi
 
       - name: Install Foundry standard library
         run: forge install foundry-rs/forge-std
@@ -44,6 +48,18 @@ jobs:
 
       - name: Build
         run: forge build --sizes
+
+      - name: Discover source pair when not supplied
+        if: ${{ env.V2_PAIR == '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pair=$(cast call "$V2_FACTORY" "getPair(address,address)(address)" "$BORROW_TOKEN" "$REPAYMENT_TOKEN" --rpc-url "$RPC_URL")
+          pair=$(echo "$pair" | tr -d '[:space:]')
+          test -n "$pair" || { echo 'Factory returned empty pair'; exit 1; }
+          test "$pair" != "0x0000000000000000000000000000000000000000" || { echo 'Factory pair does not exist'; exit 1; }
+          echo "V2_PAIR=$pair" >> "$GITHUB_ENV"
+          echo "Discovered V2 pair: $pair"
 
       - name: Run real deployment inspection
         run: forge test --match-path test/FlashSwapExecutor.fork.t.sol -vvv
