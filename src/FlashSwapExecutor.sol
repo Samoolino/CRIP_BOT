@@ -60,6 +60,7 @@ contract FlashSwapExecutor {
     ) external onlyOwner {
         if (configuredPair != address(0)) revert PairAlreadyConfigured();
         if (pair == address(0) || IV2Pair(pair).factory() != factory) revert InvalidPair();
+        if (IV2Router02(router).factory() != factory) revert InvalidPair();
 
         address token0 = IV2Pair(pair).token0();
         address token1 = IV2Pair(pair).token1();
