@@ -2,6 +2,13 @@
 pragma solidity ^0.8.26;
 
 interface IV2Router02 {
+    function factory() external view returns (address);
+
+    function getAmountsOut(
+        uint256 amountIn,
+        address[] calldata path
+    ) external view returns (uint256[] memory amounts);
+
     function swapExactTokensForTokens(
         uint256 amountIn,
         uint256 amountOutMin,

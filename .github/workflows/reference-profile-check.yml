@@ -1,0 +1,31 @@
+name: Reference Profile Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  reference-profile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Ethereum Sepolia Uniswap V2 reference profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path('config/uniswap-v2-sepolia-reference.json')
+          data = json.loads(p.read_text())
+
+          assert data['chainId'] == 11155111
+          assert data['factory'].lower() == '0xf62c03e08ada871a0beb309762e260a7a6a880e6'
+          assert data['router02'].lower() == '0xee567fe1712faf6149d80da1e6934e354124cfe3'
+          assert data['liveExecutionAuthorized'] is False
+          assert data['status'] == 'reference-profile-only'
+          assert data.get('pair') in (None, '')
+          print('Ethereum Sepolia reference profile validated.')
+          PY
