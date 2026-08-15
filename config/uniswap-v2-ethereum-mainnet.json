@@ -1,0 +1,17 @@
+{
+  "network": "ethereum-mainnet",
+  "chainId": 1,
+  "protocol": "Uniswap V2",
+  "factory": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+  "router02": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  "referencePair": {
+    "name": "DAI-WETH",
+    "address": "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11"
+  },
+  "source": {
+    "deploymentAddresses": "https://developers.uniswap.org/docs/protocols/v2/deployments",
+    "pairVerification": "https://developers.uniswap.org/docs/ecosystem/subgraphs/guides/v2-query-examples"
+  },
+  "status": "reference-profile-only",
+  "liveExecutionAuthorized": false
+}
