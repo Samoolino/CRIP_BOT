@@ -10,6 +10,6 @@ optimizer_runs = 200
 via_ir = true
 
 [fmt]
-line_length = 100
-single_quote = true
-multiline_func_header = "attributes_first"
+line_length = 120
+quote_style = "double"
+multiline_func_header = "params_first"
