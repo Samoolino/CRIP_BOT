@@ -18,7 +18,7 @@ jobs:
           import json
           from pathlib import Path
 
-          p = Path('config/uniswap-v2-ethereum-sepolia.json')
+          p = Path('config/uniswap-v2-sepolia-reference.json')
           data = json.loads(p.read_text())
 
           assert data['chainId'] == 11155111
