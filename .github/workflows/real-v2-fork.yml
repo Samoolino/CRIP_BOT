@@ -1,0 +1,27 @@
+name: Real V2 Fork Gate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  real-v2-fork:
+    runs-on: ubuntu-latest
+    env:
+      RPC_URL: ${{ secrets.CIP_RPC_URL }}
+      V2_FACTORY: ${{ secrets.CIP_V2_FACTORY }}
+      V2_ROUTER: ${{ secrets.CIP_V2_ROUTER }}
+      V2_PAIR: ${{ secrets.CIP_V2_PAIR }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Install Foundry standard library
+        run: forge install foundry-rs/forge-std
+
+      - name: Run real deployment inspection
+        run: forge test --match-path test/FlashSwapExecutor.fork.t.sol -vvv
