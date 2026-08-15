@@ -6,11 +6,16 @@ import {FlashSwapExecutor} from "../src/FlashSwapExecutor.sol";
 import {IV2Pair} from "../src/interfaces/IV2Pair.sol";
 
 interface IExecutionRouter {
-    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
+    function getAmountsOut(
+        uint256 amountIn,
+        address[] calldata path
+    ) external view returns (uint256[] memory amounts);
 }
 
 interface IERC20Like {
-    function balanceOf(address account) external view returns (uint256);
+    function balanceOf(
+        address account
+    ) external view returns (uint256);
 }
 
 /// @notice Opt-in real-protocol atomic execution gate. No mocks are used.
