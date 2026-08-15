@@ -8,7 +8,11 @@ import {IV2Pair} from "../src/interfaces/IV2Pair.sol";
 /// @notice Discovers and validates an existing V2 pair from a real factory.
 /// @dev Read-only operation: this script never broadcasts a transaction.
 contract DiscoverPair is Script {
-    function run(address factory, address tokenA, address tokenB) external view {
+    function run(
+        address factory,
+        address tokenA,
+        address tokenB
+    ) external view {
         require(factory != address(0), "factory is zero");
         require(tokenA != address(0) && tokenB != address(0), "token is zero");
         require(tokenA != tokenB, "tokens identical");
@@ -21,8 +25,7 @@ contract DiscoverPair is Script {
         address token0 = p.token0();
         address token1 = p.token1();
         require(
-            (token0 == tokenA || token0 == tokenB) && (token1 == tokenA || token1 == tokenB),
-            "pair tokens mismatch"
+            (token0 == tokenA || token0 == tokenB) && (token1 == tokenA || token1 == tokenB), "pair tokens mismatch"
         );
         (uint112 reserve0, uint112 reserve1,) = p.getReserves();
         require(reserve0 > 0 && reserve1 > 0, "pair has no liquidity");
