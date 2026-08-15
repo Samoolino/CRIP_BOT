@@ -69,7 +69,7 @@ contract FlashSwapExecutor {
     /// @param amount Amount borrowed.
     /// @param path Exact swap route beginning with the borrowed asset and ending with the
     ///             opposite pair asset used to repay the flash swap.
-    /// @param minProfit Minimum surplus of the repayment asset after repayment.
+    /// @param minProfit Minimum NEW surplus of the repayment asset after repayment.
     function execute(
         address borrowToken,
         uint256 amount,
@@ -118,6 +118,10 @@ contract FlashSwapExecutor {
             revert InvalidPath();
         }
 
+        // Profit must be measured from the route's newly received repayment token,
+        // not from any token balance the executor may have held before execution.
+        uint256 repaymentBalanceBefore = IERC20(repaymentToken).balanceOf(address(this));
+
         _approve(borrowToken, router, borrowed);
         IV2Router02(router).swapExactTokensForTokens(
             borrowed,
@@ -128,10 +132,12 @@ contract FlashSwapExecutor {
         );
 
         uint256 repayment = _repayment(borrowed, amount0 > 0);
-        uint256 repaymentBalance = IERC20(repaymentToken).balanceOf(address(this));
-        if (repaymentBalance < repayment) revert InsufficientProfit(0, minProfit);
+        uint256 repaymentBalanceAfter = IERC20(repaymentToken).balanceOf(address(this));
+        if (repaymentBalanceAfter < repaymentBalanceBefore + repayment) {
+            revert InsufficientProfit(0, minProfit);
+        }
 
-        uint256 profit = repaymentBalance - repayment;
+        uint256 profit = repaymentBalanceAfter - repaymentBalanceBefore - repayment;
         if (profit < minProfit) revert InsufficientProfit(profit, minProfit);
 
         _transfer(repaymentToken, msg.sender, repayment);
